@@ -1,11 +1,13 @@
-
 name: Build Android APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,51 +18,102 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Find Android SDK
+      - name: Show project structure
+        run: |
+          echo "Repository root:"
+          pwd
+          ls -la
+
+          echo "Searching for Gradle settings:"
+          find . -maxdepth 5 -type f \( \
+            -name settings.gradle \
+            -o -name settings.gradle.kts \
+            -o -name build.gradle \
+            -o -name build.gradle.kts \
+          \) -print
+
+      - name: Locate Android project
+        id: project
         shell: bash
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
+          if [ -f "settings.gradle" ] || \
+             [ -f "settings.gradle.kts" ] || \
+             [ -f "build.gradle" ] || \
+             [ -f "build.gradle.kts" ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          else
+            SETTINGS=$(find . -maxdepth 5 -type f \
+              \( -name settings.gradle \
+              -o -name settings.gradle.kts \) \
+              -print -quit)
 
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          SDKMANAGER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found"
-            exit 1
+            if [ -n "$SETTINGS" ]; then
+              echo "dir=$(dirname "$SETTINGS")" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Gradle project not found. Check repository files."
+              exit 1
+            fi
           fi
-          yes | "$SDKMANAGER" --licenses || true
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          "$SDKMANAGER" --install \
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | sort -V | tail -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::Android sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Build APK
-        run: gradle assembleDebug
+      - name: Build debug APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Find generated APK
+        id: apk
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          APK=$(find . -type f -path "*/build/outputs/apk/*/*.apk" \
+            -not -path "*/build/outputs/apk/*/androidTest/*" \
+            -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "::error::APK was not generated"
+            exit 1
+          fi
+
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "APK generated: $APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NeuroLauncher-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: NEURO-Launcher-APK
+          path: ${{ steps.project.outputs.dir }}/${{ steps.apk.outputs.path }}
           if-no-files-found: error
+          retention-days: 14
