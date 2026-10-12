@@ -2,11 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,72 +19,79 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Show project structure
-        run: |
-          echo "Repository root:"
-          pwd
-          ls -la
-
-          echo "Searching for Gradle settings:"
-          find . -maxdepth 5 -type f \( \
-            -name settings.gradle \
-            -o -name settings.gradle.kts \
-            -o -name build.gradle \
-            -o -name build.gradle.kts \
-          \) -print
-
-      - name: Locate Android project
+      # If a project ZIP is uploaded to the repository, unpack it and build from it.
+      # Otherwise, build the Gradle project already present in the repository.
+      - name: Prepare Android project
         id: project
         shell: bash
         run: |
-          if [ -f "settings.gradle" ] || \
-             [ -f "settings.gradle.kts" ] || \
-             [ -f "build.gradle" ] || \
-             [ -f "build.gradle.kts" ]; then
-            echo "dir=." >> "$GITHUB_OUTPUT"
-          else
-            SETTINGS=$(find . -maxdepth 5 -type f \
-              \( -name settings.gradle \
-              -o -name settings.gradle.kts \) \
-              -print -quit)
+          set -euo pipefail
 
-            if [ -n "$SETTINGS" ]; then
-              echo "dir=$(dirname "$SETTINGS")" >> "$GITHUB_OUTPUT"
+          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -iname '*.zip' \
+            ! -name 'NEURO-Launcher-APK.zip' -print -quit || true)"
+
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found project ZIP: $ZIP_FILE"
+            EXTRACT_DIR="$RUNNER_TEMP/neuro-project"
+            mkdir -p "$EXTRACT_DIR"
+            unzip -oq "$ZIP_FILE" -d "$EXTRACT_DIR"
+            SEARCH_ROOT="$EXTRACT_DIR"
+          else
+            echo "No project ZIP found; using repository files."
+            SEARCH_ROOT="$GITHUB_WORKSPACE"
+          fi
+
+          SETTINGS_FILE="$(find "$SEARCH_ROOT" -maxdepth 7 -type f \
+            \( -name 'settings.gradle' -o -name 'settings.gradle.kts' \) \
+            -print -quit || true)"
+
+          if [ -n "$SETTINGS_FILE" ]; then
+            PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          else
+            BUILD_FILE="$(find "$SEARCH_ROOT" -maxdepth 7 -type f \
+              \( -name 'build.gradle' -o -name 'build.gradle.kts' \) \
+              -print -quit || true)"
+            if [ -n "$BUILD_FILE" ]; then
+              PROJECT_DIR="$(dirname "$BUILD_FILE")"
             else
-              echo "::error::Gradle project not found. Check repository files."
+              echo "::error::No Gradle project found. Ensure the ZIP contains settings.gradle and app/build.gradle."
+              echo "Files in search root:"
+              find "$SEARCH_ROOT" -maxdepth 4 -type f | head -200
               exit 1
             fi
           fi
 
-      - name: Install Android SDK packages
+          echo "Project directory: $PROJECT_DIR"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          ls -la "$PROJECT_DIR"
+
+      - name: Accept Android SDK licenses and install SDK
         run: |
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
-            -type f -name sdkmanager | sort -V | tail -n 1)
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "::error::Android sdkmanager not found"
-            exit 1
-          fi
-
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
-          "$SDKMANAGER" \
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
       - name: Build debug APK
         working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
             ./gradlew assembleDebug --no-daemon
@@ -94,26 +99,10 @@ jobs:
             gradle assembleDebug --no-daemon
           fi
 
-      - name: Find generated APK
-        id: apk
-        working-directory: ${{ steps.project.outputs.dir }}
-        run: |
-          APK=$(find . -type f -path "*/build/outputs/apk/*/*.apk" \
-            -not -path "*/build/outputs/apk/*/androidTest/*" \
-            -print -quit)
-
-          if [ -z "$APK" ]; then
-            echo "::error::APK was not generated"
-            exit 1
-          fi
-
-          echo "path=$APK" >> "$GITHUB_OUTPUT"
-          echo "APK generated: $APK"
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NEURO-Launcher-APK
-          path: ${{ steps.project.outputs.dir }}/${{ steps.apk.outputs.path }}
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
