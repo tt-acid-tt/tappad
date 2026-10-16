@@ -7,7 +7,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.view.animation.OvershootInterpolator;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -29,7 +28,7 @@ public class MainActivity extends Activity {
     private int power;
     private long upgradeCost;
     private TextView coinsText;
-    private TextView powerText;
+    private TextView tapHint;
     private TextView upgradeDescription;
     private Button upgradeButton;
     private Button tapButton;
@@ -104,8 +103,7 @@ public class MainActivity extends Activity {
         tapParams.topMargin = dp(24);
         page.addView(tapButton, tapParams);
 
-        TextView tapHint = label("Нажми, чтобы получить +" + power + " монету", 13, MUTED, false);
-        tapHint.setTag("tap_hint");
+        tapHint = label("", 13, MUTED, false);
         LinearLayout.LayoutParams tapHintParams = fullWidth();
         tapHintParams.topMargin = dp(12);
         page.addView(tapHint, tapHintParams);
@@ -172,34 +170,11 @@ public class MainActivity extends Activity {
 
     private void updateUi() {
         coinsText.setText(NumberFormat.getNumberInstance(Locale.getDefault()).format(coins));
-        powerText = null;
         upgradeDescription.setText("Сила нажатия: +" + power);
+        tapHint.setText("Нажми, чтобы получить +" + power + (power == 1 ? " монету" : " монеты"));
         upgradeButton.setText("УЛУЧШИТЬ  •  " + NumberFormat.getNumberInstance(Locale.getDefault()).format(upgradeCost) + " монет");
         upgradeButton.setEnabled(coins >= upgradeCost);
         upgradeButton.setAlpha(coins >= upgradeCost ? 1f : 0.55f);
-        View hint = findHintView((View) coinsText.getParent().getParent());
-        // The tap hint is updated by walking the root view tree below.
-        updateTapHint(getWindow().getDecorView(), "Нажми, чтобы получить +" + power + (power == 1 ? " монету" : " монеты"));
-    }
-
-    private View findHintView(View root) {
-        if (root instanceof TextView && "tap_hint".equals(root.getTag())) return root;
-        if (root instanceof LinearLayout) {
-            LinearLayout group = (LinearLayout) root;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View found = findHintView(group.getChildAt(i));
-                if (found != null) return found;
-            }
-        }
-        if (root instanceof ScrollView && ((ScrollView) root).getChildCount() > 0) {
-            return findHintView(((ScrollView) root).getChildAt(0));
-        }
-        return null;
-    }
-
-    private void updateTapHint(View root, String text) {
-        View found = findHintView(root);
-        if (found instanceof TextView) ((TextView) found).setText(text);
     }
 
     private void save() {
