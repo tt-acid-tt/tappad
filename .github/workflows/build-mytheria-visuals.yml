@@ -34,5 +34,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MytheriaVisualsMenu-Minecraft-1.21.4
-          path: MytheriaVisualsMenu/build/libs/*.jar
+          path: MytheriaVisualsMenu/build/libs/mytheria-visuals-menu-1.0.0.jar
           if-no-files-found: error
