@@ -1,35 +1,16 @@
-# NEON CLICKER
+# SupermarketTogehterXRAK
 
-Небольшая Android-игра-кликер с тёмным неоновым оформлением. Нажимай на большую кнопку, зарабатывай монеты и улучшай силу каждого нажатия.
+The repository's main project is now a Unity 6 first-person supermarket simulator prototype for Windows.
 
-## Возможности
+## Unity game
+Open the [SupermarketTogehterXRAK project folder](SupermarketTogehterXRAK/). It generates a 3D supermarket at runtime with shelves, colorful product packs, refrigerators, checkout islands, a stock room, shopper NPCs, lighting, first-person movement and a basic host/join multiplayer menu.
 
-- Получай монеты нажатием на кнопку **TAP**.
-- Покупай улучшения, чтобы зарабатывать больше монет за одно нажатие.
-- Прогресс, сила нажатия и стоимость улучшения сохраняются на устройстве.
-- Интерфейс адаптирован для телефона и не требует подключения к интернету во время игры.
+- Unity version: 6000.0.40f1
+- Controls: WASD, mouse look, Shift sprint, E interact, Escape cursor
+- Multiplayer transport: Unity Netcode for GameObjects + Unity Transport (UDP 7777)
+- Windows build workflow: [build-windows-game.yml](.github/workflows/build-windows-game.yml)
 
-## Требования
+See [the game README](SupermarketTogehterXRAK/README.md) for setup and current limitations. This is an early playable prototype; economy/NPC state is not yet server-authoritative, and the generated product models are placeholders for a future PBR art pass.
 
-- Android 8.0 (API 26) или новее.
-- Для сборки используется GitHub Actions; Android Studio на телефоне устанавливать не нужно.
-
-## Как скачать APK
-
-1. Открой вкладку **Actions** этого репозитория.
-2. Выбери workflow **Build Android APK**.
-3. Нажми **Run workflow** или открой сборку, запущенную автоматически после изменений в ветке `main`.
-4. Дождись успешного завершения сборки.
-5. Открой запуск workflow и найди раздел **Artifacts**.
-6. Скачай архив **NEON-CLICKER-APK** и распакуй его.
-7. Установи APK на Android-телефон. Разрешай установку только если доверяешь файлу и источнику.
-
-Если сборка завершилась с ошибкой, открой неудачный запуск во вкладке **Actions** и посмотри журнал шага, отмеченного как failed.
-
-## Сборка
-
-Workflow настраивает Java 17, Gradle 8.9 и Android SDK, затем запускает задачу `assembleDebug` и загружает APK как артефакт GitHub Actions на 14 дней.
-
-## Данные и приватность
-
-Игровой прогресс хранится локально в настройках приложения. Игра не требует регистрации и не запрашивает пароль или токен.
+## Legacy Android project
+The original Android project remains under the existing Gradle files and app/ folder. It has not been deleted.
