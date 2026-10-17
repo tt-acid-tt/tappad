@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mytheria_visuals_menu",
+  "version": "${version}",
+  "name": "Mytheria Visuals Menu",
+  "description": "A modern rounded visuals-style menu opened with Right Shift.",
+  "authors": ["Acid"],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.acid.mytheria.MytheriaVisualsMenu"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
